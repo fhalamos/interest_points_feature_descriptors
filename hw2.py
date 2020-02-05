@@ -190,13 +190,54 @@ def find_interest_points(image, max_points = 200, scale = 1.0):
                  (using the default scheme suggested above, K = 72)
 """
 def extract_features(image, xs, ys, scale = 1.0):
-   # check that image is grayscale
-   assert image.ndim == 2, 'image should be grayscale'
-   ##########################################################################
-   # TODO: YOUR CODE HERE
-   raise NotImplementedError('extract_features')
-   ##########################################################################
-   return feats
+  # check that image is grayscale
+  assert image.ndim == 2, 'image should be grayscale'
+
+  dx, dy = sobel_gradients(image)
+  mag   = np.sqrt((dx * dx) + (dy * dy))
+  theta = np.arctan2(dy, dx)
+
+  feats = np.empty([len(xs), 72])
+
+  width = 3
+
+  #For each of the interest points, capture histogram of gradients around it
+  for index, px in enumerate(xs):
+    py = ys[index]
+
+    print(px,py)
+    
+    #Build center of different windows
+    deviations = [-3,0,3]
+    windows_centers = []
+    for dev_x in deviations:
+      for dev_y in deviations:
+        windows_centers.append((px+dev_x,py+dev_y))
+
+    
+
+
+    #For each of the windows
+    for (wc_x, wc_y) in windows_centers:
+      
+      wc_x = int(wc_x)
+      wc_y = int(wc_y)
+
+      print(wc_x, wc_y)
+      #Extract region of interest
+      roi = image[wc_y - 1:wc_y + 2, wc_x-1:wc_x+2]
+      print(wc_y-1,wc_y+2,wc_x-1,wc_x+2)
+        
+
+    print("")
+
+    # feats[index,i]=
+
+
+
+
+   # raise NotImplementedError('extract_features')
+  return feats
 
 """
    FEATURE MATCHING (7 Points Implementation + 3 Points Write-up)
