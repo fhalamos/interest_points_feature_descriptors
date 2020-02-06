@@ -144,6 +144,25 @@ def find_interest_points(image, max_points = 200, scale = 1.0):
     scores = [scores[i] for i in top_scores_indices]
   return xs, ys, scores
 
+
+'''
+Returns array of length 8, indication energy of each orientation
+The energy of each orientation equals the sum of the magnitudes of the gradients that 
+fall in the given orientation.
+'''
+def get_gradient_histogram_of_window(mag, theta):
+  energy = np.zeros(8)
+
+  for row_i, row_theta in enumerate(theta):
+    for col_i, angle in enumerate(row_theta):
+      angle_translated = angle + np.pi #angles now from 0 to 2pi
+      list_index = int(angle_translated/(np.pi/4)) if int(angle_translated/(np.pi/4)) != 8 else 0
+      energy[list_index]+= mag[row_i, col_i] #we save the magnitude of the gradient
+
+  return energy
+
+
+
 """
    FEATURE DESCRIPTOR (12 Points Implementation + 3 Points Write-up)
 
@@ -197,43 +216,35 @@ def extract_features(image, xs, ys, scale = 1.0):
   mag   = np.sqrt((dx * dx) + (dy * dy))
   theta = np.arctan2(dy, dx)
 
-  feats = np.empty([len(xs), 72])
-
-  width = 3
+  feats = np.empty(len(xs)*72)
 
   #For each of the interest points, capture histogram of gradients around it
-  for index, px in enumerate(xs):
-    py = ys[index]
+  for interest_point_index, px in enumerate(xs):
+    py = ys[interest_point_index]
 
-    print(px,py)
     
-    #Build center of different windows
+    #For each of the 9 neighboring windows
     deviations = [-3,0,3]
-    windows_centers = []
+
     for dev_x in deviations:
       for dev_y in deviations:
-        windows_centers.append((px+dev_x,py+dev_y))
+        wc_x = int(px+dev_x)
+        wc_y = int(py+dev_y)
 
-    
+        #Extract region of interest
+        mag_roi = mag[wc_y - 1:wc_y + 2, wc_x-1:wc_x+2]
+        theta_roi = theta[wc_y - 1:wc_y + 2, wc_x-1:wc_x+2]
 
+        window_histogram = get_gradient_histogram_of_window(mag_roi, theta_roi)
 
-    #For each of the windows
-    for (wc_x, wc_y) in windows_centers:
-      
-      wc_x = int(wc_x)
-      wc_y = int(wc_y)
+        # print("window_histogram")
+        # print(window_histogram)
+        #Save feature
+        for i in range(0,8): 
+         feats[interest_point_index*8+i] = window_histogram[i]
 
-      print(wc_x, wc_y)
-      #Extract region of interest
-      roi = image[wc_y - 1:wc_y + 2, wc_x-1:wc_x+2]
-      print(wc_y-1,wc_y+2,wc_x-1,wc_x+2)
-        
-
-    print("")
-
-    # feats[index,i]=
-
-
+  # print("feats")
+  # print(feats)
 
 
    # raise NotImplementedError('extract_features')
@@ -253,7 +264,7 @@ def extract_features(image, xs, ys, scale = 1.0):
    For each match, also return a real-valued score indicating the quality of
    the match.  This score could be based on a distance ratio test, in order
    to quantify distinctiveness of the closest match in relation to the second
-   closest match.  It could optionally also incorporate scores of the interest
+   closest match. It could optionally also incorporate scores of the interest
    points at which the matched features were extracted.  You are free to
    design your own criterion. Note that you are required to implement the naive
    linear NN search. For 'lsh' and 'kdtree' search mode, you could do either to
