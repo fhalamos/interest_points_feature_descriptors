@@ -89,7 +89,7 @@ def find_interest_points(image, max_points = 200, scale = 1.0):
   #1. Spatial derivative calculation
   I_x, I_y = sobel_gradients(image)
 
-  #2. Matrix of second derivatives through gaussians
+  #2. Matrix of second derivatives
 
   # The classic “Harris” detector (Harris and Stephens
   # 1988) uses a [-2 -1 0 1 2] filter, but more modern variants (Schmid, Mohr, and Bauckhage
@@ -127,7 +127,7 @@ def find_interest_points(image, max_points = 200, scale = 1.0):
   scores = np.empty(1)
 
   #5. Find corners using R > 0
-  for rowindex, response in enumerate(image_corners_nm):
+  for rowindex, response in enumerate(image_corners_nm  ):
     for colindex, r in enumerate(response):
         if r > 0:
           # image_corners[rowindex, colindex] = r
@@ -139,9 +139,9 @@ def find_interest_points(image, max_points = 200, scale = 1.0):
   #If length of identified points is > max_points, we should return the highest scores
   if(xs.size>max_points):
     top_scores_indices = scores.argsort()[-max_points:][::-1]
-    xs = [xs[i] for i in top_scores_indices]
-    ys = [ys[i] for i in top_scores_indices]
-    scores = [scores[i] for i in top_scores_indices]
+    xs = np.asarray([xs[i] for i in top_scores_indices])
+    ys = np.asarray([ys[i] for i in top_scores_indices])
+    scores = np.asarray([scores[i] for i in top_scores_indices])
   return xs, ys, scores
 
 
@@ -155,9 +155,10 @@ def get_gradient_histogram_of_window(mag, theta):
 
   for row_i, row_theta in enumerate(theta):
     for col_i, angle in enumerate(row_theta):
+
       angle_translated = angle + np.pi #angles now from 0 to 2pi
       list_index = int(angle_translated/(np.pi/4)) if int(angle_translated/(np.pi/4)) != 8 else 0
-      energy[list_index]+= mag[row_i, col_i] #we save the magnitude of the gradient
+      energy[list_index]+= mag[row_i, col_i]
 
   return energy
 
@@ -212,43 +213,47 @@ def extract_features(image, xs, ys, scale = 1.0):
   # check that image is grayscale
   assert image.ndim == 2, 'image should be grayscale'
 
+  image = mirror_border(image, wx = 4, wy = 4)
+
   dx, dy = sobel_gradients(image)
   mag   = np.sqrt((dx * dx) + (dy * dy))
   theta = np.arctan2(dy, dx)
-
-  feats = np.empty(len(xs)*72)
+    
+  feats = np.empty([len(xs),72])
 
   #For each of the interest points, capture histogram of gradients around it
   for interest_point_index, px in enumerate(xs):
-    py = ys[interest_point_index]
-
     
-    #For each of the 9 neighboring windows
-    deviations = [-3,0,3]
+    px = px + 4 #Considering we added padding
+    py = ys[interest_point_index] + 4
 
-    for dev_x in deviations:
-      for dev_y in deviations:
+    #For each of the 9 neighboring windows
+    deviations_x = [-3,0,3]
+    deviations_y = [-3,0,3]
+
+    window_counter=0
+    for dev_x in deviations_x:
+      for dev_y in deviations_y:
         wc_x = int(px+dev_x)
         wc_y = int(py+dev_y)
 
         #Extract region of interest
-        mag_roi = mag[wc_y - 1:wc_y + 2, wc_x-1:wc_x+2]
-        theta_roi = theta[wc_y - 1:wc_y + 2, wc_x-1:wc_x+2]
+        mag_roi = mag[wc_x-1:wc_x+2, wc_y - 1:wc_y + 2]
+        theta_roi = theta[wc_x-1:wc_x+2, wc_y - 1:wc_y + 2]
 
         window_histogram = get_gradient_histogram_of_window(mag_roi, theta_roi)
 
-        # print("window_histogram")
-        # print(window_histogram)
         #Save feature
         for i in range(0,8): 
-         feats[interest_point_index*8+i] = window_histogram[i]
+          feats[interest_point_index,window_counter*8+i] = window_histogram[i]
 
-  # print("feats")
-  # print(feats)
+        window_counter+=1
 
-
-   # raise NotImplementedError('extract_features')
   return feats
+
+
+def chiSquared(p,q):
+    return 0.5*np.sum((p-q)**2/(p+q+1e-6))
 
 """
    FEATURE MATCHING (7 Points Implementation + 3 Points Write-up)
@@ -345,11 +350,26 @@ def extract_features(image, xs, ys, scale = 1.0):
                  for each match
 """
 def match_features(feats0, feats1, scores0, scores1, mode='naive'):
-   ##########################################################################
-   # TODO: YOUR CODE HERE
-   raise NotImplementedError('match_features')
-   ##########################################################################
-   return matches, scores
+  
+  n_features_0, k = feats0.shape
+
+  matches = np.zeros(n_features_0)#, dtype=np.int8)#, dtype=float64)#, dtype=np.int8)
+  scores = np.zeros(n_features_0)#, dtype=np.float64)#, dtype=np.int8)
+
+  for index_0, f_0 in enumerate(feats0):
+    n_features_1, _ = feats1.shape
+    distances_to_f1 = np.empty(n_features_1)
+
+    for index_1, f_1 in enumerate(feats1):
+      distances_to_f1[index_1] = chiSquared(f_0,f_1)
+ 
+    index_best, index_second_best = distances_to_f1.argsort()[0:2]
+    matches[index_0] = index_best
+    scores[index_0] = distances_to_f1[index_second_best]/distances_to_f1[index_best]
+
+  matches = matches.astype(int)
+
+  return matches, scores
 
 """
    HOUGH TRANSFORM (7 Points Implementation + 3 Points Write-up)
