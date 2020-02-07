@@ -158,7 +158,7 @@ def get_gradient_histogram_of_window(mag, theta):
 
       angle_translated = angle + np.pi #angles now from 0 to 2pi
       list_index = int(angle_translated/(np.pi/4)) if int(angle_translated/(np.pi/4)) != 8 else 0
-      energy[list_index]+= mag[row_i, col_i]
+      energy[list_index]+= 1#mag[row_i, col_i]
 
   return energy
 
@@ -247,13 +247,127 @@ def extract_features(image, xs, ys, scale = 1.0):
         for i in range(0,8): 
           feats[interest_point_index,window_counter*8+i] = window_histogram[i]
 
+        if((window_histogram == np.zeros(8)).all()):
+          print("DAMNNNNNNNNNNNNNNNNNNN")
+        # else:
+        #   print(window_histogram)
+
         window_counter+=1
+
+
 
   return feats
 
 
+
+def to_int_array(string_of_ints):
+  return np.asarray([int(c) for c in string_of_ints])
+
 def chiSquared(p,q):
     return 0.5*np.sum((p-q)**2/(p+q+1e-6))
+
+class LSH:
+  def __init__(self):
+    print("Creating lsh instance")
+    self.hash_table = {}
+
+
+  #Subroutine to project feature vector and binarize
+  #The high dimensional feature vectors are randomly projected
+  #into low dimension space which are further binarized as boolean hashcodes.
+  def compute_hash_code(self, feature_vector):
+    np.random.seed(0)
+
+    k = 4#int(len(feature_vector)/4)
+    hash_code = ""#np.empty(k)
+
+    hyperplanes = np.random.randint(low=0, high=10, size=k) #remember that values in features are ints between 0 and 9
+    feature_index_to_consider = np.random.randint(low=0, high=len(feature_vector), size=k)
+
+    for i in range(k):
+      boolean_for_feature = 1 if feature_vector[feature_index_to_consider[i]] > hyperplanes[i] else 0
+      hash_code = hash_code + str(boolean_for_feature)
+
+    return hash_code
+
+
+
+
+  #Constructing hash table for all input features
+  def generate_hash_table(self, features):
+
+    #Save each feature in hash table
+    for f_index, feature in enumerate(features):
+      feature_hash = self.compute_hash_code(feature)
+
+      #Each value in the hash table is a list of all features (and their index in the original features list) that match to the same feature_hash
+      if feature_hash in self.hash_table:
+        self.hash_table[feature_hash].append((f_index, feature))
+      else:
+        self.hash_table[feature_hash] = [(f_index, feature)]
+
+
+  #Of all the existing hash in the hash_table, find the one closes to feature_hash
+  def find_closest_hash(self,feature_hash):
+
+    best_existing_feature_hash=""
+    closest_distance=np.inf
+
+    for existing_feature_hash in self.hash_table:
+      dist = np.linalg.norm(to_int_array(existing_feature_hash)-to_int_array(feature_hash))
+      if(dist<closest_distance):
+        closest_distance = dist
+        best_existing_feature_hash = existing_feature_hash
+
+    return best_existing_feature_hash
+
+  #Subroutine to search hash table
+  def search_hash_table(self, feature):
+    feature_hash = self.compute_hash_code(feature)
+
+    if feature_hash in self.hash_table:
+      return self.hash_table[feature_hash]
+    else:
+      closest_hash = self.find_closest_hash(feature_hash)
+
+      # print(feature_hash)
+      # print(closest_hash)
+
+      return self.hash_table[closest_hash]
+
+  #Search nearest neighbour for input feature vector
+  def search_feat_nn(self, feature):
+
+    candidate_neighbours = self.search_hash_table(feature)
+
+    distances_to_neighbours = np.empty(len(candidate_neighbours))
+
+    #Remember that each element in candidate_neighbours is a tuple of (feature_index,feature)
+    for i, (neighbour_index, neighbour) in enumerate(candidate_neighbours): 
+      distances_to_neighbours[i] = chiSquared(feature, neighbour)
+     
+    if(len(distances_to_neighbours) == 1):
+      index_best, _ = candidate_neighbours[0]
+      distance_to_best = distances_to_neighbours[0]
+      index_second_best=None
+      distance_to_second_best=None
+
+    else:
+      #Indexes ending with _ are respect to distances_to_neighbours list
+      index_best_, index_second_best_ = distances_to_neighbours.argsort()[0:2]
+      
+      distance_to_best = distances_to_neighbours[index_best_]
+      distance_to_second_best = distances_to_neighbours[index_second_best_]
+
+      #Indexes not ending with _ are respect to original features list
+      index_best, _  = candidate_neighbours[index_best_]
+      index_second_best, _  = candidate_neighbours[index_second_best_]
+
+    
+    return index_best, index_second_best, distance_to_best, distance_to_second_best
+   
+
+
 
 """
    FEATURE MATCHING (7 Points Implementation + 3 Points Write-up)
@@ -348,24 +462,55 @@ def chiSquared(p,q):
                  in feats0, the index of the best matching feature in feats1
       scores   - a numpy array of shape (N0,) containing a real-valued score
                  for each match
-"""
+"""  
 def match_features(feats0, feats1, scores0, scores1, mode='naive'):
-  
+
   n_features_0, k = feats0.shape
 
-  matches = np.zeros(n_features_0)#, dtype=np.int8)#, dtype=float64)#, dtype=np.int8)
-  scores = np.zeros(n_features_0)#, dtype=np.float64)#, dtype=np.int8)
+  matches = np.zeros(n_features_0)
+  scores = np.zeros(n_features_0)
 
-  for index_0, f_0 in enumerate(feats0):
-    n_features_1, _ = feats1.shape
-    distances_to_f1 = np.empty(n_features_1)
+  empty_array = np.zeros(72)
 
-    for index_1, f_1 in enumerate(feats1):
-      distances_to_f1[index_1] = chiSquared(f_0,f_1)
- 
-    index_best, index_second_best = distances_to_f1.argsort()[0:2]
-    matches[index_0] = index_best
-    scores[index_0] = distances_to_f1[index_second_best]/distances_to_f1[index_best]
+  if(mode=='naive'):
+    for index_0, f_0 in enumerate(feats0):
+
+      if((f_0==empty_array).all()):
+          print("PUTA MADREEEEEEEEEE")
+          print(index_0)
+
+
+      n_features_1, _ = feats1.shape
+      distances_to_f1 = np.empty(n_features_1)
+
+      for index_1, f_1 in enumerate(feats1):
+        distances_to_f1[index_1] = chiSquared(f_0,f_1)
+
+        # if(chiSquared(f_0,f_1)==0):
+        #   print("WAY")
+        #   print(f_0)
+        #   print(f_1)
+   
+      index_best, index_second_best = distances_to_f1.argsort()[0:2]
+      matches[index_0] = index_best
+
+      if(distances_to_f1[index_best]==0):
+        print("UPS")
+        print(f_0)
+        print(feats1[index_best])
+
+      scores[index_0] = distances_to_f1[index_second_best]/distances_to_f1[index_best]
+
+  elif(mode=='lsh'):
+    lsh = LSH()
+    lsh.generate_hash_table(feats1)
+    
+    for index_0, f_0 in enumerate(feats0):
+      index_best, index_second_best, distance_to_best, distance_to_second_best = lsh.search_feat_nn(f_0)
+
+      matches[index_0] = index_best
+      scores[index_0] = distance_to_second_best/distance_to_best if distance_to_best else np.inf
+
 
   matches = matches.astype(int)
 
@@ -410,8 +555,48 @@ def match_features(feats0, feats1, scores0, scores1, mode='naive'):
                 your own convenience and you are free to design its format
 """
 def hough_votes(xs0, ys0, xs1, ys1, matches, scores):
-   ##########################################################################
-   # TODO: YOUR CODE HERE
-   raise NotImplementedError('hough_votes')
-   ##########################################################################
-   return tx, ty, votes
+
+  #First lets find the min and max transformations in x and y
+  min_dx = None
+  max_dx = None
+  min_dy = None
+  max_dy = None
+
+  translations = []
+
+  for index_point, index_match in enumerate(matches):
+
+    dx = xs0[index_point]- xs1[index_match]
+    dy = ys0[index_point]- ys1[index_match]
+
+    #Update dimmensions of grid of translations
+    if(min_dx is None or dx<min_dx):
+      min_dx=dx
+    if(max_dx is None or dx>max_dx):
+      max_dx=dx
+    if(min_dy is None or dy<min_dy):
+      min_dy=dy
+    if(max_dy is None or dy>max_dy):
+      max_dy=dy
+
+    #Save transformations
+    translations.append((dx,dy,scores[index_point]))
+
+  #Input transformations in a grid of translations
+  #Each cell in grid will be a 3x3 px cell
+  translations_grid = np.empty([int((max_dx-min_dx)/3)+1, int((max_dy-min_dy)/3)+1])
+  
+  for translation in translations:
+    dx, dy, score = translation
+    translations_grid[int((dx-min_dx)/3), int((dy-min_dy)/3)] += score
+
+  #Search for element in grid with highest socre
+  highest_score=0
+  for row_i, row in enumerate(translations_grid):
+    for col_i, value in enumerate(row):
+      if value>highest_score:
+        highest_score=value
+        tx = row_i*3 + min_dx+1
+        ty = col_i*3 + min_dy+1
+  
+  return tx, ty, translations_grid
