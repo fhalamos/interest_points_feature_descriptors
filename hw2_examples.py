@@ -113,23 +113,23 @@ feats1 = extract_features(img1, xs1, ys1, 1.0)
 
 
 
-img_list = glob.glob('data/shanghai/*.png')
-img_list.sort()
+# img_list = glob.glob('data/shanghai/*.png')
+# img_list.sort()
 
-empty_array = np.zeros(72)
+# empty_array = np.zeros(72)
 
-for img_path in img_list:
-    print(img_path)
-    img0 = load_image(img_path)
-    xs0, ys0, scores0 = find_interest_points(img0, N, 1.0)
-    feats0 = extract_features(img0, xs0, ys0, 1.0)
+# for img_path in img_list:
+#     print(img_path)
+#     img0 = load_image(img_path)
+#     xs0, ys0, scores0 = find_interest_points(img0, N, 1.0)
+#     feats0 = extract_features(img0, xs0, ys0, 1.0)
 
-    for f in feats0:
-        # print("a")
-        # print(type(f))
-        # print(f.size)
-        if((f==empty_array).all()):
-            print("PUTA MADREEEEEEEEEE!!!!")
+#     for f in feats0:
+#         # print("a")
+#         # print(type(f))
+#         # print(f.size)
+#         if((f==empty_array).all()):
+#             print("PUTA MADREEEEEEEEEE!!!!")
 
 # print(feats0)
 
@@ -167,37 +167,39 @@ show_overlay(img0, img1, tx, ty)
 #plt.show(block = False)
 # plt.show()
 
-# # Time benchmarking- compare match_features run time for different modes in image
-# # retrival task. Please include running time in your report and please modify the
-# # testing mode and leave either 'lsh' or 'kdtree' according to your implementation
+# Time benchmarking- compare match_features run time for different modes in image
+# retrival task. Please include running time in your report and please modify the
+# testing mode and leave either 'lsh' or 'kdtree' according to your implementation
 
-# testing_mode = ['naive', 'lsh']#, 'kdtree']
-# disp_num = 5
-# img_list = glob.glob('data/shanghai/*.png')
-# img_list.sort()
+print("EEEEEEEEEEEEEEEE")
 
-# data = pickle.load(open('data/shanghai_database_feat.pth','rb'))
-# score, feat = data
-# N,M, C = feat.shape
-# for mode in testing_mode:
-#     t1 = time.time()
-#     match,score = match_features(feat[0], feat[1:].reshape(-1,C), score[0], score[1:].reshape(-1), mode = mode)
-#     t2 = time.time()
-#     print("{} takes {} sec".format(mode, t2 - t1))
-#     match_score = np.zeros((N-1,))
-#     for i in range(N-1):
-#         mask = (i * M <= match) * (match < (i + 1) * M)
-#         if mask.sum() != 0:
-#             match_score[i] = score[mask].sum()
-#     match_img_id = match_score.argsort()[::-1][:disp_num]
-#     fig, axis = plt.subplots(2,3)
-#     axis[0,0].imshow(load_image(img_list[0]), cmap = 'gray')
-#     axis[0,0].set_title('query')
-#     for i in range(disp_num):
-#         r = int((i + 1) / 3)
-#         c = int((i + 1) % 3)
-#         axis[r,c].imshow(load_image(img_list[match_img_id[i] + 1]), cmap = 'gray')
-#         axis[r,c].set_title('sim score: {0:.1f}'.format(match_score[match_img_id[i]]))
-#     fig.suptitle("{}, search time: {:.3f} sec".format(mode, t2 - t1))
-#     # plt.show(block = False)
-# # plt.show()
+testing_mode = ['naive', 'lsh']#, 'kdtree']
+disp_num = 5
+img_list = glob.glob('data/shanghai/*.png')
+img_list.sort()
+
+data = pickle.load(open('data/shanghai_database_feat.pth','rb'))
+feat_score, feat = data
+N,M, C = feat.shape
+for mode in testing_mode:
+    t1 = time.time()
+    match,score = match_features(feat[0], feat[1:].reshape(-1,C), feat_score[0], feat_score[1:].reshape(-1), mode = mode)
+    t2 = time.time()
+    print("{} takes {} sec".format(mode, t2 - t1))
+    match_score = np.zeros((N-1,))
+    for i in range(N-1):
+        mask = (i * M <= match) * (match < (i + 1) * M)
+        if mask.sum() != 0:
+            match_score[i] = score[mask].sum()
+    match_img_id = match_score.argsort()[::-1][:disp_num]
+    fig, axis = plt.subplots(2,3)
+    axis[0,0].imshow(load_image(img_list[0]), cmap = 'gray')
+    axis[0,0].set_title('query')
+    for i in range(disp_num):
+        r = int((i + 1) / 3)
+        c = int((i + 1) % 3)
+        axis[r,c].imshow(load_image(img_list[match_img_id[i] + 1]), cmap = 'gray')
+        axis[r,c].set_title('sim score: {0:.1f}'.format(match_score[match_img_id[i]]))
+    fig.suptitle("{}, search time: {:.3f} sec".format(mode, t2 - t1))
+    # plt.show(block = False)
+plt.show()
