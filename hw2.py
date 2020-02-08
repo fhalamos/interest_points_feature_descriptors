@@ -95,8 +95,7 @@ def find_interest_points(image, max_points = 200, scale = 1.0):
   # 1988) uses a [-2 -1 0 1 2] filter, but more modern variants (Schmid, Mohr, and Bauckhage
   # 2000; Triggs 2004) convolve the image with horizontal and vertical derivatives of a Gaussian
   # (typically with σ = 1)
-
-  #---> Im not fully getting this step
+  
   Ixx = conv_2d_gaussian(I_x**2)
   Ixy = conv_2d_gaussian(I_y*I_x)
   Iyy = conv_2d_gaussian(I_y**2)
@@ -158,7 +157,7 @@ def get_gradient_histogram_of_window(mag, theta):
 
       angle_translated = angle + np.pi #angles now from 0 to 2pi
       list_index = int(angle_translated/(np.pi/4)) if int(angle_translated/(np.pi/4)) != 8 else 0
-      energy[list_index]+= 1#mag[row_i, col_i]
+      energy[list_index]+= 1#Alternatively mag[row_i, col_i]
 
   return energy
 
@@ -272,7 +271,7 @@ class LSH:
   def compute_hash_code(self, feature_vector):
     np.random.seed(self.seed)
 
-    k = 30 #int(len(feature_vector)/4)
+    k = 50 #int(len(feature_vector)/4)
     hash_code = ""#np.empty(k)
 
     hyperplanes = np.random.randint(low=0, high=10, size=k) #remember that values in features are ints between 0 and 9
@@ -477,7 +476,7 @@ def match_features(feats0, feats1, scores0, scores1, mode='naive'):
   elif(mode=='lsh'):
 
     #Choose number of hash tables to use
-    lsh_dicts = [LSH(i) for i in range(1,3)] #We are choosing to use only one hash_table because if not perfomance degrades a lot
+    lsh_dicts = [LSH(i) for i in range(1,2)] #We are choosing to use only one hash_table because if not perfomance degrades a lot
     for lsh in lsh_dicts:
       lsh.generate_hash_table(feats1)
     
