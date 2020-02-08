@@ -27,7 +27,12 @@ I used histogram of gradients for feature descriptor.
 For every point of interest, i look at the 3x3 spacial grid (window) around it, each of them of width 3. For each window, i created a length 8 histogram, one for each pi/4th theta segment, and saved the magnitud of the gradients that fall in each of the theta segments.
 -had to use padding so as to capture windowss
 
-#MATCHES
+# FEATURE MATCHING
+
+   In addition to your implementation, include a brief write-up (in hw2.pdf)
+   of your design choices. You are required to report the efficiency comparison
+   between different modes by measure the runtime (check the benchmarking related
+   codes in hw2_example.py).
 
 ##Navie
 -used chisquare in naive, better for distances between distribution
@@ -48,8 +53,9 @@ among all matched queries. My performance was degraded a lot when doing this.
 # HOUGH TRANSFORM
 
 The goal of this method is to find the 'most representative' translational vector.
-Given that there are many different translational vector between two images, the approach used consists in building a grid of transitional vectors (similar transitional vectors will end up in the same cell in the grid), and each cell will consist of the sum of the scores of the transitional vectors on it.
 
-In the x-axis, the grid contains all possible values of transitional vectors in the x direction. Analogous is done for y-axis.
+Given that there are many different translational vectors between two images, the approach used consists in building a grid of translational vectors (similar translational vectors will end up in the same cell in the grid), and each cell will consist of the sum of the scores of the translational vectors on it.
 
-My approach was to build a grid, where each cell location represented a particular translation (a value of 5 in x axis represented translations of 5 in the x_domain). The value of the cells in the grid where the sum the scores of all translations that ended up in that cell.
+In the x-axis, the grid contains all possible values of translational vectors in the x direction. Analogous is done for y-axis.
+
+I found that an optimal size of each cell in the grid was a 3x3 pixels.
