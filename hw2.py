@@ -267,18 +267,18 @@ def chiSquared(p,q):
     return 0.5*np.sum((p-q)**2/(p+q+1e-6))
 
 class LSH:
-  def __init__(self):
+  def __init__(self, seed):
     print("Creating lsh instance")
     self.hash_table = {}
-
+    self.seed=seed
 
   #Subroutine to project feature vector and binarize
   #The high dimensional feature vectors are randomly projected
   #into low dimension space which are further binarized as boolean hashcodes.
   def compute_hash_code(self, feature_vector):
-    np.random.seed(0)
+    np.random.seed(self.seed)
 
-    k = 4#int(len(feature_vector)/4)
+    k = 20 #int(len(feature_vector)/4)
     hash_code = ""#np.empty(k)
 
     hyperplanes = np.random.randint(low=0, high=10, size=k) #remember that values in features are ints between 0 and 9
@@ -289,9 +289,6 @@ class LSH:
       hash_code = hash_code + str(boolean_for_feature)
 
     return hash_code
-
-
-
 
   #Constructing hash table for all input features
   def generate_hash_table(self, features):
@@ -344,11 +341,13 @@ class LSH:
 
     #Remember that each element in candidate_neighbours is a tuple of (feature_index,feature)
     for i, (neighbour_index, neighbour) in enumerate(candidate_neighbours): 
-      distances_to_neighbours[i] = chiSquared(feature, neighbour)
+      distances_to_neighbours[i] = np.linalg.norm(feature - neighbour)#chiSquared(feature, neighbour)
      
     if(len(distances_to_neighbours) == 1):
       index_best, _ = candidate_neighbours[0]
       distance_to_best = distances_to_neighbours[0]
+
+#-------->We look for the second closest neighbor in next bucket.. to be done
       index_second_best=None
       distance_to_second_best=None
 
@@ -463,6 +462,8 @@ class LSH:
       scores   - a numpy array of shape (N0,) containing a real-valued score
                  for each match
 """  
+import pdb
+
 def match_features(feats0, feats1, scores0, scores1, mode='naive'):
 
   n_features_0, k = feats0.shape
@@ -475,41 +476,32 @@ def match_features(feats0, feats1, scores0, scores1, mode='naive'):
   if(mode=='naive'):
     for index_0, f_0 in enumerate(feats0):
 
-      if((f_0==empty_array).all()):
-          print("PUTA MADREEEEEEEEEE")
-          print(index_0)
-
-
       n_features_1, _ = feats1.shape
       distances_to_f1 = np.empty(n_features_1)
 
       for index_1, f_1 in enumerate(feats1):
-        distances_to_f1[index_1] = chiSquared(f_0,f_1)
-
-        # if(chiSquared(f_0,f_1)==0):
-        #   print("WAY")
-        #   print(f_0)
-        #   print(f_1)
+        distances_to_f1[index_1] = np.linalg.norm(f_0-f_1)#chiSquared(f_0,f_1)
    
       index_best, index_second_best = distances_to_f1.argsort()[0:2]
       matches[index_0] = index_best
 
-      if(distances_to_f1[index_best]==0):
-        print("UPS")
-        print(f_0)
-        print(feats1[index_best])
+      # if(distances_to_f1[index_best]==0):
+      #   print("UPS")
+      #   print(f_0)
+      #   print(feats1[index_best])
 
-      scores[index_0] = distances_to_f1[index_second_best]/distances_to_f1[index_best]
+      scores[index_0] = distances_to_f1[index_second_best]/(distances_to_f1[index_best]+0.00000000000001)
 
   elif(mode=='lsh'):
-    lsh = LSH()
+
+    lsh = LSH(1)
     lsh.generate_hash_table(feats1)
     
     for index_0, f_0 in enumerate(feats0):
       index_best, index_second_best, distance_to_best, distance_to_second_best = lsh.search_feat_nn(f_0)
 
       matches[index_0] = index_best
-      scores[index_0] = distance_to_second_best/distance_to_best if distance_to_best else np.inf
+      scores[index_0] = distance_to_second_best/(distance_to_best+0.00000000000001)
 
 
   matches = matches.astype(int)
