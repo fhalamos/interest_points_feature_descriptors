@@ -272,7 +272,7 @@ class LSH:
   def compute_hash_code(self, feature_vector):
     np.random.seed(self.seed)
 
-    k = 20 #int(len(feature_vector)/4)
+    k = 30 #int(len(feature_vector)/4)
     hash_code = ""#np.empty(k)
 
     hyperplanes = np.random.randint(low=0, high=10, size=k) #remember that values in features are ints between 0 and 9
@@ -305,74 +305,56 @@ class LSH:
     closest_distance=np.inf
 
     for existing_feature_hash in self.hash_table:
-      dist = np.linalg.norm(to_int_array(existing_feature_hash)-to_int_array(feature_hash))
-      if(dist<closest_distance):
-        closest_distance = dist
-        best_existing_feature_hash = existing_feature_hash
+      #We dont want to look at hashes same as the one we have
+      if(existing_feature_hash != feature_hash):
+
+        dist = np.linalg.norm(to_int_array(existing_feature_hash)-to_int_array(feature_hash))
+        if(dist<closest_distance):
+          closest_distance = dist
+          best_existing_feature_hash = existing_feature_hash
 
     return best_existing_feature_hash
 
   #Subroutine to search hash table
-  def search_hash_table(self, feature):
-    feature_hash = self.compute_hash_code(feature)
+  def search_hash_table(self, feature_hash):
 
-    if feature_hash in self.hash_table:
-      return self.hash_table[feature_hash]
+    if feature_hash not in self.hash_table:
+      return []
+
     else:
-      closest_hash = self.find_closest_hash(feature_hash)
-
-      # print(feature_hash)
-      # print(closest_hash)
-
-      return self.hash_table[closest_hash]
+      return self.hash_table[feature_hash]
+    
 
   #Search nearest neighbour for input feature vector
   def search_feat_nn(self, feature):
 
-    candidate_neighbours = self.search_hash_table(feature)
+    feature_hash = self.compute_hash_code(feature)
+
+    candidate_neighbours = self.search_hash_table(feature_hash)
+
+
+    #If there are less than 2 neighbors, ill keep looking at neighboring hash_codes
+    while(len(candidate_neighbours)<2):
+      closest_hash = self.find_closest_hash(feature_hash)
+      new_neighbours = self.search_hash_table(closest_hash)
+      candidate_neighbours.extend(new_neighbours)
+      feature_hash = closest_hash
+
 
     return candidate_neighbours
 
-    distances_to_neighbours = np.empty(len(candidate_neighbours))
-
-    #Remember that each element in candidate_neighbours is a tuple of (feature_index,feature)
-    for i, (neighbour_index, neighbour) in enumerate(candidate_neighbours): 
-      distances_to_neighbours[i] = np.linalg.norm(feature - neighbour)#chiSquared(feature, neighbour)
-     
-    if(len(distances_to_neighbours) == 1):
-      index_best, _ = candidate_neighbours[0]
-      distance_to_best = distances_to_neighbours[0]
-
-#-------->We should look for the second closest neighbor in next bucket
-      index_second_best=None
-      distance_to_second_best=None
-
-    else:
-      #Indexes ending with _ are respect to distances_to_neighbours list
-      index_best_, index_second_best_ = distances_to_neighbours.argsort()[0:2]
-      
-      distance_to_best = distances_to_neighbours[index_best_]
-      distance_to_second_best = distances_to_neighbours[index_second_best_]
-
-      #Indexes not ending with _ are respect to original features list
-      index_best, _  = candidate_neighbours[index_best_]
-      index_second_best, _  = candidate_neighbours[index_second_best_]
-
-    
-    return index_best, index_second_best, distance_to_best, distance_to_second_best
    
-
+#Returns keys associated to the 2 smallest value in dictionary d
 def get_keys_two_smallest_values(d):
 
   vals = list(d.values())
-
   vals_s = sorted(vals)
 
   lowest_value = vals_s[0]
   second_lowest_value = vals_s[1]
 
   keys = list(d.keys())
-  
+ 
   return keys[vals.index(lowest_value)], keys[vals.index(second_lowest_value)]
 
 """
@@ -490,21 +472,16 @@ def match_features(feats0, feats1, scores0, scores1, mode='naive'):
       index_best, index_second_best = distances_to_f1.argsort()[0:2]
       matches[index_0] = index_best
 
-      # if(distances_to_f1[index_best]==0):
-      #   print("UPS")
-      #   print(f_0)
-      #   print(feats1[index_best])
-
       scores[index_0] = distances_to_f1[index_second_best]/(distances_to_f1[index_best]+0.00000000000001)
 
   elif(mode=='lsh'):
 
-    #Choose number of hash tables
-    lsh_dicts = [LSH(i) for i in range(1,2)] #We are choosing to use only one hash_table because if not perfomance degrades a lot
+    #Choose number of hash tables to use
+    lsh_dicts = [LSH(i) for i in range(1,3)] #We are choosing to use only one hash_table because if not perfomance degrades a lot
     for lsh in lsh_dicts:
       lsh.generate_hash_table(feats1)
     
-    #For each interest points, find its closest features according to different hash tables
+    #For each interest points, find its closest features according to the different hash tables
     for index_0, f_0 in enumerate(feats0):
       
       #Keys will be the features index, value will be the feature itself
@@ -514,31 +491,18 @@ def match_features(feats0, feats1, scores0, scores1, mode='naive'):
       for lsh in lsh_dicts:
         closest_features_current_lsh = lsh.search_feat_nn(f_0)
 
-        #Add the discovered features to an aggregated list of closes_features. We use a dict to avoid duplicates
-        for f in closest_features_current_lsh:
-          index_f, feature = f
+        #Add the discovered features to an aggregated list of closest_features. We use a dict to avoid duplicates
+        for (index_f, feature) in closest_features_current_lsh:
           closest_features[index_f] = feature
 
       #Keys will be features index, value will be distance to f_0
-      distances_to_closest_features = {} # np.empty(len(closest_features.keys()))
+      distances_to_closest_features = {}
 
       for (close_feature_index, close_feature) in closest_features.items():
         distances_to_closest_features[close_feature_index] = np.linalg.norm(f_0-close_feature)
-
       
       index_best, index_second_best = get_keys_two_smallest_values(distances_to_closest_features)
 
-
-
-      # index_best, index_second_best, distance_to_best, distance_to_second_best = lsh.search_feat_nn(f_0)
-
-      # print("closest_features")
-      # print(closest_features.keys())
-
-      # print("index_best, index_second_best")
-      # print(index_best, index_second_best)
-
-      # print("distances")
       distance_to_best = distances_to_closest_features[index_best]
       distance_to_second_best = distances_to_closest_features[index_second_best]
 
