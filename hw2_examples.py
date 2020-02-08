@@ -151,7 +151,7 @@ matches, match_scores = match_features(feats0, feats1, scores0, scores1)
 # # print(matches)
 
 
-threshold = 2 # adjust this for your match scoring system
+threshold = 1.5 # adjust this for your match scoring system
 plot_matches(img0, img1, xs0, ys0, xs1, ys1, matches, match_scores, threshold)
 # plt.show()
 
@@ -171,13 +171,13 @@ show_overlay(img0, img1, tx, ty)
 # retrival task. Please include running time in your report and please modify the
 # testing mode and leave either 'lsh' or 'kdtree' according to your implementation
 
-print("EEEEEEEEEEEEEEEE")
 
 testing_mode = ['naive', 'lsh']#, 'kdtree']
 disp_num = 5
 img_list = glob.glob('data/shanghai/*.png')
 img_list.sort()
 
+import pdb
 data = pickle.load(open('data/shanghai_database_feat.pth','rb'))
 feat_score, feat = data
 N,M, C = feat.shape

@@ -247,11 +247,6 @@ def extract_features(image, xs, ys, scale = 1.0):
         for i in range(0,8): 
           feats[interest_point_index,window_counter*8+i] = window_histogram[i]
 
-        if((window_histogram == np.zeros(8)).all()):
-          print("DAMNNNNNNNNNNNNNNNNNNN")
-        # else:
-        #   print(window_histogram)
-
         window_counter+=1
 
 
@@ -268,7 +263,6 @@ def chiSquared(p,q):
 
 class LSH:
   def __init__(self, seed):
-    print("Creating lsh instance")
     self.hash_table = {}
     self.seed=seed
 
@@ -337,6 +331,8 @@ class LSH:
 
     candidate_neighbours = self.search_hash_table(feature)
 
+    return candidate_neighbours
+
     distances_to_neighbours = np.empty(len(candidate_neighbours))
 
     #Remember that each element in candidate_neighbours is a tuple of (feature_index,feature)
@@ -347,7 +343,7 @@ class LSH:
       index_best, _ = candidate_neighbours[0]
       distance_to_best = distances_to_neighbours[0]
 
-#-------->We look for the second closest neighbor in next bucket.. to be done
+#-------->We should look for the second closest neighbor in next bucket
       index_second_best=None
       distance_to_second_best=None
 
@@ -366,7 +362,18 @@ class LSH:
     return index_best, index_second_best, distance_to_best, distance_to_second_best
    
 
+def get_keys_two_smallest_values(d):
 
+  vals = list(d.values())
+
+  vals_s = sorted(vals)
+
+  lowest_value = vals_s[0]
+  second_lowest_value = vals_s[1]
+
+  keys = list(d.keys())
+  
+  return keys[vals.index(lowest_value)], keys[vals.index(second_lowest_value)]
 
 """
    FEATURE MATCHING (7 Points Implementation + 3 Points Write-up)
@@ -462,8 +469,6 @@ class LSH:
       scores   - a numpy array of shape (N0,) containing a real-valued score
                  for each match
 """  
-import pdb
-
 def match_features(feats0, feats1, scores0, scores1, mode='naive'):
 
   n_features_0, k = feats0.shape
@@ -494,11 +499,48 @@ def match_features(feats0, feats1, scores0, scores1, mode='naive'):
 
   elif(mode=='lsh'):
 
-    lsh = LSH(1)
-    lsh.generate_hash_table(feats1)
+    #Choose number of hash tables
+    lsh_dicts = [LSH(i) for i in range(1,2)] #We are choosing to use only one hash_table because if not perfomance degrades a lot
+    for lsh in lsh_dicts:
+      lsh.generate_hash_table(feats1)
     
+    #For each interest points, find its closest features according to different hash tables
     for index_0, f_0 in enumerate(feats0):
-      index_best, index_second_best, distance_to_best, distance_to_second_best = lsh.search_feat_nn(f_0)
+      
+      #Keys will be the features index, value will be the feature itself
+      closest_features = {}
+
+      #Look at closes features for each of the hash tables
+      for lsh in lsh_dicts:
+        closest_features_current_lsh = lsh.search_feat_nn(f_0)
+
+        #Add the discovered features to an aggregated list of closes_features. We use a dict to avoid duplicates
+        for f in closest_features_current_lsh:
+          index_f, feature = f
+          closest_features[index_f] = feature
+
+      #Keys will be features index, value will be distance to f_0
+      distances_to_closest_features = {} # np.empty(len(closest_features.keys()))
+
+      for (close_feature_index, close_feature) in closest_features.items():
+        distances_to_closest_features[close_feature_index] = np.linalg.norm(f_0-close_feature)
+
+      
+      index_best, index_second_best = get_keys_two_smallest_values(distances_to_closest_features)
+
+
+
+      # index_best, index_second_best, distance_to_best, distance_to_second_best = lsh.search_feat_nn(f_0)
+
+      # print("closest_features")
+      # print(closest_features.keys())
+
+      # print("index_best, index_second_best")
+      # print(index_best, index_second_best)
+
+      # print("distances")
+      distance_to_best = distances_to_closest_features[index_best]
+      distance_to_second_best = distances_to_closest_features[index_second_best]
 
       matches[index_0] = index_best
       scores[index_0] = distance_to_second_best/(distance_to_best+0.00000000000001)
