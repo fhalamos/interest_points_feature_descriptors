@@ -1,11 +1,15 @@
-# HOMEWORK 2 WRITEUP
-by Felipe Alamos
+---
+title: "HOMEWORK 2 WRITEUP"
+author: "Felipe Alamos"
+date: 02/08/2020
+output: pdf_document
+---
 
 ## INTEREST POINT OPERATOR
 
 I used the Harris corner detector, which is a well known algorithm for detecting with interest points. 
 
-To compute the matrix of second derivatives needed in the Harris algorithm, I convolve the image with horizontal and vertical derivatives of a Gaussian (σ = 1). This is a modern variant of the algorithm introduced by Schmid, Mohr, and Bauckhage 2000.
+To compute the matrix of second derivatives needed in the Harris algorithm, I convolve the image with horizontal and vertical derivatives of a Gaussian (sigma = 1). This is a modern variant of the algorithm introduced by Schmid, Mohr, and Bauckhage 2000.
 
 <!--   # The classic “Harris” detector (Harris and Stephens
   # 1988) uses a [-2 -1 0 1 2] filter, but more modern variants (Schmid, Mohr, and Bauckhage
@@ -22,6 +26,10 @@ For making these, and any other design choices, keep in mind a target of
 obtaining a few hundred interest points on the examples included with
 this assignment, with enough repeatability to have a large number of
 reliable matches between different views. -->
+
+![](Figure_1.png)
+
+![](Figure_2.png)
 
 ## FEATURE DESCRIPTOR 
 
@@ -58,8 +66,11 @@ First of all, I created an _LSH_ class that implements all necessary methods to 
 
 The amount of hash_tables used can me modified in line 480 of method _match_features_. This enables us to increase robustness. I first instantiate the hash_tables desired, with different seeds, saving in the buckets the features from feats1. Then, for each feature point in feats0, I get all its closest points as the union of closest points obtained from the different hash_tables. Finally, for that set of candidate points, I calculate the distance of our feature point with each of them and capture the two closest ones. 
 
-### Efficiency comparison
 
+![](Figure_3.png)
+
+### Efficiency comparison
+Feature matching:
 After a series of iterations, testing performance (sim scores and runtime), I find that the ideal setting is to use 2 hash tables, each of them with hash_codes of length 20.
 
 Under that setting, the results are as follows:
@@ -75,6 +86,18 @@ Lastly, if we vary the length of hash codes, we know both runtime and sim scores
 lsh with 1 hash tables and hash codes length 20: Runtime: 1.719. Simscores: [165.5 27.9 13.3 8.5 5.2]
 lsh with 1 hash tables and hash codes length 50: Runtime: 1.250. Simscores: [125.8 29.5 10.6 7.0 6.5]
 
+_2 hash tables, hash code length 30:_
+
+![](Figure_6.png)
+
+_1 hash tables, hash code length 20:_
+
+![](Figure_6_1hash20code.png)
+
+_1 hash tables, hash code length 50:_
+
+![](Figure_6_1hash50code.png)
+
 ## HOUGH TRANSFORM
 
 The goal of this method is to find the 'most representative' translational vector.
@@ -84,3 +107,5 @@ Given that there are many different translational vectors between two images, th
 In the x-axis, the grid contains all possible values of the x-component of the translational vectors. Analogous is done for y-axis.
 
 I found that an optimal size of each cell in the grid was a 3x3 pixels.
+
+![](Figure_4.png)
